@@ -2,7 +2,7 @@ package com.example.source_code.Model;
 
 import java.util.*;
 
-public class Test {
+public class NAFCP {
     private final PPCNode root;
     private final Map<String, List<PPCode>> nListMap;
     private final List<String> frequentItems;
@@ -10,16 +10,14 @@ public class Test {
     private double minSup;
     private int transactionCount;
     private final List<Set<String>> frequentClosedItemsets;
-    private final Map<Integer, List<Set<String>>> supportToFCIs; // Bảng băm cho isSubsumed
 
 
-    public Test() {
+    public NAFCP() {
         root = new PPCNode("null");
         nListMap = new HashMap<>();
         frequentItems = new ArrayList<>();
         itemFrequency = new HashMap<>();
         frequentClosedItemsets = new ArrayList<>();
-        supportToFCIs = new HashMap<>();
     }
 
     // Bước 1: Quét dữ liệu và xây dựng PPC-tree
@@ -124,8 +122,10 @@ public class Test {
 
     private void generateNListForNode(PPCNode node) {
         if (node == null || node.item.equals("null")) {
-            for (PPCNode child : node.children) {
-                generateNListForNode(child);
+            if (node != null) {
+                for (PPCNode child : node.children) {
+                    generateNListForNode(child);
+                }
             }
             return;
         }
@@ -184,34 +184,36 @@ public class Test {
                         removed.add(XA);
                         removed.add(XB);
                         newCandidates.add(XAB);
-                        System.out.println("Theorem 2: Replaced XA and XB with XAB: " + XAB);
+                        System.out.println("      Theorem 2: Replaced XA and XB with XAB: " + XAB);
                     } else {
                         // Theorem 1: chỉ thay thế XB bằng XBA, XA giữ nguyên
                         List<PPCode> nListXBA = generateNListFromInclusion(nListXB, nListXA);
                         nListMap.put(String.join(",", XAB), nListXBA);
 
-                        removed.add(XB); // ❗ chỉ loại XB
+                        removed.add(XB); //  chỉ loại XB
                         newCandidates.add(XAB);
-                        System.out.println("Theorem 1: Replaced XB with XAB (XBA): " + XAB);
+                        System.out.println("      Theorem 1: Replaced XB with XAB (XBA): " + XAB);
                     }
                 }
                 else {
-                    // Không bao hàm → giao tổ tiên-con
+                    System.out.println("      Not Subset → perform ancestor-descendant intersection");
+                    // Không bao hàm - giao tổ tiên-con
                     Set<String> XAB = new HashSet<>(XA);
                     XAB.addAll(XB);
                     List<PPCode> nListXAB = intersectNLists(nListXA, nListXB);
                     if (calculateSupport(nListXAB) >= minSup * transactionCount) {
-                        if (!isSubsumed(XAB)) {
-                            frequentClosedItemsets.add(XAB);
-                            System.out.println("    Added XAB to FCIs: " + XAB);
-                        }
                         nListMap.put(String.join(",", XAB), nListXAB);
+                        if (isSubsumed(XAB, candidates)) {
+                            frequentClosedItemsets.add(XAB);
+                            System.out.println("      Added XAB to FCIs: " + XAB);
+                        }
+                        newCandidates.add(XB);
                         newCandidates.add(XAB);
                     }
                 }
             }
 
-            if (!removed.contains(XA) && !isSubsumed(XA)) {
+            if (!removed.contains(XA) && isSubsumed(XA, candidates)) {
                 frequentClosedItemsets.add(XA);
                 System.out.println("  Added XA to FCIs: " + XA);
             }
@@ -250,13 +252,6 @@ public class Test {
         return true;
     }
 
-    // Kiểm tra tần suất của tập hợp
-    private boolean isFrequent(Set<String> itemset) {
-        List<PPCode> nList = getNList(itemset);
-        int support = calculateSupport(nList);
-        return support >= minSup * transactionCount;
-    }
-
     // Lấy N-list của tập hợp
     private List<PPCode> getNList(Set<String> itemset) {
         if(itemset.size() > 1){
@@ -276,21 +271,6 @@ public class Test {
             return intersection != null ? intersection : new ArrayList<>();
         }
     }
-
-    // Lấy N-list của tập hợp
-//    private List<PPCode> getNList(Set<String> itemset) {
-//        List<PPCode> intersection = null;
-//        for (String item : itemset) {
-//            List<PPCode> nList = nListMap.get(item);
-//            if (nList == null) return new ArrayList<>();
-//            if (intersection == null) {
-//                intersection = new ArrayList<>(nList);
-//            } else {
-//                intersection = intersectNLists(intersection, nList);
-//            }
-//        }
-//        return intersection != null ? intersection : new ArrayList<>();
-//    }
 
     // Giao các N-list dựa trên quan hệ tổ tiên-con
     private List<PPCode> intersectNLists(List<PPCode> nListXA, List<PPCode> nListXB) {
@@ -326,24 +306,43 @@ public class Test {
     }
 
     // Kiểm tra tính đóng với bảng băm
-    private boolean isSubsumed(Set<String> itemset) {
+    private boolean isSubsumed(Set<String> itemset, List<Set<String>> candidates) {
+        System.out.println("     Checking if itemset " + itemset + " is subsuming existing FCIs...");
+
+        List<Set<String>> toRemove = new ArrayList<>();
         List<PPCode> itemsetNList = getNList(itemset);
-        int itemsetSupport = calculateSupport(itemsetNList);
-        List<Set<String>> fcis = supportToFCIs.getOrDefault(itemsetSupport, new ArrayList<>());
-        for (Set<String> fci : fcis) {
-            if (fci.containsAll(itemset)) {
-                return true;
+        int supportItemset = calculateSupport(itemsetNList);
+        System.out.println("        Support of itemset: " + supportItemset);
+
+        for (Set<String> fci : frequentClosedItemsets) {
+            int supportFci = calculateSupport(getNList(fci));
+            if (itemset.containsAll(fci) && supportItemset >= supportFci) {
+                System.out.println("         Itemset " + itemset + " subsumes " + fci + " (support: " + supportFci + ")");
+                toRemove.add(fci);
             }
         }
-        fcis.add(itemset);
-        supportToFCIs.put(itemsetSupport, fcis);
-        return false;
+
+        if (toRemove.isEmpty()) {
+            System.out.println("         Itemset " + itemset + " is not subsuming any existing FCI.");
+            return true;
+        } else {
+            for (Set<String> removed : toRemove) {
+                System.out.println("         Removing subsumed FCI: " + removed);
+                frequentClosedItemsets.remove(removed);
+                candidates.remove(removed);
+            }
+            System.out.println("         Adding itemset " + itemset + " as a new FCI.");
+            frequentClosedItemsets.add(itemset);
+            return false;
+        }
     }
+
 
     // Trả về kết quả
     public List<Set<String>> getFrequentClosedItemsets() {
         return frequentClosedItemsets;
     }
+
 
     // Hàm main để thử nghiệm
     public static void main(String[] args) {
@@ -356,7 +355,7 @@ public class Test {
         transactions.add(Arrays.asList("A", "C", "D", "T", "W", "E"));
         transactions.add(Arrays.asList("C", "D", "T", "E"));
 
-        Test nafcp = new Test();
+        NAFCP nafcp = new NAFCP();
         nafcp.buildPPCTree(transactions, 0.5); // minSup = 50%
         nafcp.generateNLists();
         nafcp.findFCIs();
@@ -366,5 +365,6 @@ public class Test {
         for (Set<String> itemset : nafcp.getFrequentClosedItemsets()) {
             System.out.println(itemset + " #SUP: " + nafcp.calculateSupport(nafcp.getNList(itemset)));
         }
+
     }
 }
