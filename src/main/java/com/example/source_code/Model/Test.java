@@ -2,7 +2,7 @@ package com.example.source_code.Model;
 
 import java.util.*;
 
-public class NAFCP {
+public class Test {
     private final PPCNode root;
     private final Map<String, List<PPCode>> nListMap;
     private final List<String> frequentItems;
@@ -12,7 +12,7 @@ public class NAFCP {
     private final List<Set<String>> frequentClosedItemsets;
 
 
-    public NAFCP() {
+    public Test() {
         root = new PPCNode("null");
         nListMap = new HashMap<>();
         frequentItems = new ArrayList<>();
@@ -343,4 +343,28 @@ public class NAFCP {
         return frequentClosedItemsets;
     }
 
+
+    // Hàm main để thử nghiệm
+    public static void main(String[] args) {
+        // Dữ liệu giao dịch mẫu
+        List<List<String>> transactions = new ArrayList<>();
+        transactions.add(Arrays.asList("A", "C", "T", "W"));
+        transactions.add(Arrays.asList("C", "D", "W"));
+        transactions.add(Arrays.asList("A", "C", "T", "W"));
+        transactions.add(Arrays.asList("A", "C", "D", "W"));
+        transactions.add(Arrays.asList("A", "C", "D", "T", "W", "E"));
+        transactions.add(Arrays.asList("C", "D", "T", "E"));
+
+        Test nafcp = new Test();
+        nafcp.buildPPCTree(transactions, 0.5); // minSup = 50%
+        nafcp.generateNLists();
+        nafcp.findFCIs();
+
+        // In kết quả cuối cùng
+        System.out.println("\nFinal Frequent Closed Itemsets:");
+        for (Set<String> itemset : nafcp.getFrequentClosedItemsets()) {
+            System.out.println(itemset + " #SUP: " + nafcp.calculateSupport(nafcp.getNList(itemset)));
+        }
+
+    }
 }
