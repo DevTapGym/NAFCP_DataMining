@@ -4,12 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PPCNode {
-    String item;
-    int frequency;
+    public String item;
     PPCNode parent;
-    List<PPCNode> children;
-    int preOrder;
-    int postOrder;
+    public List<PPCNode> children;
+    public int frequency;
+    public int preOrder;
+    public int postOrder;
 
     public PPCNode(String item) {
         this.item = item;

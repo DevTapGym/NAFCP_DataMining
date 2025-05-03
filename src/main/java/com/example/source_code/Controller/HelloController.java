@@ -1,23 +1,33 @@
 package com.example.source_code.Controller;
 import com.example.source_code.Model.NAFCP;
+import com.example.source_code.Model.PPCNode;
+import com.example.source_code.Model.PPCode;
 import com.example.source_code.Model.Transaction;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.Group;
 import javafx.scene.chart.PieChart;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
+import javafx.util.Duration;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class HelloController {
 
@@ -25,10 +35,7 @@ public class HelloController {
     private Button btnLoadData;
 
     @FXML
-    private Button btnDataMining;
-
-    @FXML
-    private TextArea txtData;
+    private TextFlow textFlow;
 
     @FXML
     private TableView<Transaction> tableView;
@@ -48,12 +55,32 @@ public class HelloController {
     @FXML
     private Label labelMinSup;
 
+    @FXML
+    private Label labelTransactionItem;
+
+    @FXML
+    private Label labelTransactionCount;
+
+    @FXML
+    private Label labelSupportCount;
+
+    @FXML
+    private Pane paneDraw;
+
+    @FXML
+    private ScrollPane scrollPane;
+
+    @FXML
+    private ScrollPane scrollPane1;
+
     private List<List<String>> transactions = new ArrayList<>();
     private double minSup = 50.0;
 
     @FXML
     public void initialize() {
         labelMinSup.setText("Min-Supporst: "+minSup +" %");
+
+        updateLabel();
 
         colId.setCellValueFactory(new PropertyValueFactory<>("id"));
         colItems.setCellValueFactory(new PropertyValueFactory<>("itemDescription"));
@@ -80,11 +107,32 @@ public class HelloController {
             slider.setValue(rounded);
             minSup = rounded;
             labelMinSup.setText("Min-Supporst: "+minSup +" %");
+            updateLabel();
         });
+
+        Platform.runLater(() -> {
+            scrollPane.setHvalue(0.49);
+            scrollPane.setVvalue(0.0);
+        });
+
+        scrollPane1.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+    }
+
+    private void updateLabel() {
+        int transactionItem = transactions.stream()
+                .mapToInt(List::size)
+                .sum();
+        int transactionCount = transactions.size();
+        int threshold = (int) Math.ceil((minSup/100) * transactionCount);
+
+        labelTransactionItem.setText("Transaction item: "+ transactionItem);
+        labelTransactionCount.setText("Transaction count: "+ transactionCount);
+        labelSupportCount.setText("Supporst count: "+threshold);
     }
 
     @FXML
     private void handleLoadData(ActionEvent ignoredEvent) {
+        deleteOldData();
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Chọn file CSV");
         fileChooser.getExtensionFilters().add(
@@ -96,10 +144,7 @@ public class HelloController {
             loadCSVData(file);
         }
         else{
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Lỗi");
-            alert.setContentText("Tải dữ liệu lên thất bại. Vui lòng thực hiện lại");
-            alert.showAndWait();
+            showErrorAlert("Lỗi dữ liệu", "Tải dữ liệu lên thất bại. Vui lòng thực hiện lại");
         }
     }
 
@@ -107,19 +152,71 @@ public class HelloController {
     private void dataMining(ActionEvent ignoredEvent) {
         if(transactions.isEmpty())
         {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Lỗi");
-            alert.setHeaderText("Không thể khai thác tập phổ biến đóng");
-            alert.setContentText("Vui lòng kiểm tra lại tập dữ liệu.");
-            alert.showAndWait();
+            showErrorAlert("Lỗi dữ liệu","Bạn chưa tải dữ liệu lên. Vui lòng kiểm tra lại tập dữ liệu.");
         }
         else{
+            deleteOldData();
+
             NAFCP nafcp = new NAFCP();
-            nafcp.buildPPCTree(transactions, 0.5); // minSup = 50%
+            nafcp.buildPPCTree(transactions, minSup / 100);
+            List<String> frequentItems = nafcp.getFrequentItems();
+
+            appendTextToFlow("Các tập thõa mãn ngưỡng min-sup: \n",true);
+            for (String item : frequentItems) {
+                appendTextToFlow(item+" ",false);
+            }
+
+            appendTextToFlow("\nKhởi tạo PPC-tree: \n",true);
+            drawTree(nafcp.getRoot(),paneDraw,2000, 50, 240);
+
+            appendTextToFlow("Khởi tạo N-List: \n",true);
             nafcp.generateNLists();
+            for (Map.Entry<String, List<PPCode>> entry : nafcp.getnListMap().entrySet()) {
+                appendTextToFlow(entry.getKey() + ": " + entry.getValue()+"\n",false);
+            }
+
+            appendTextToFlow("Các tập phổ biến đóng sau khi khai thác: \n",true);
             nafcp.findFCIs();
+
+            for (Set<String> itemset : nafcp.getFrequentClosedItemsets()) {
+                appendTextToFlow(itemset + " #SUP: " + nafcp.calculateSupport(nafcp.getNList(itemset))+"\n",false);
+            }
+
         }
     }
+
+    @FXML
+    private void handleDelete(ActionEvent ignoredEvent) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Xác nhận");
+        alert.setHeaderText("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu");
+        alert.setContentText("Tất cả dữ liệu sẽ bị xóa.");
+
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                minSup = 50.0;
+                slider.setValue(50);
+                deleteOldData();
+                tableView.getItems().clear();
+                transactions = new ArrayList<>();
+                updatePieChart(transactions);
+                updateLabel();
+            }
+        });
+
+    }
+
+    public void deleteOldData(){
+        textFlow.getChildren().clear();
+        paneDraw.getChildren().clear();
+    }
+
+    public void appendTextToFlow(String content, boolean isBold) {
+        Text text = new Text(content);
+        text.setFont(Font.font("System", isBold ? FontWeight.BOLD : FontWeight.NORMAL, 14));
+        textFlow.getChildren().add(text);
+    }
+
 
     private void loadCSVData(File file) {
         ObservableList<Transaction> data = FXCollections.observableArrayList();
@@ -132,19 +229,28 @@ public class HelloController {
             while ((line = reader.readLine()) != null) {
                 if (firstLine) {
                     firstLine = false;
+                    // Kiểm tra tiêu đề cột
+                    String[] header = line.split(",", 2);
+                    if (header.length != 2 || !"TransactionID".equals(header[0].trim()) || !"ItemDescription".equals(header[1].trim())) {
+                        showErrorAlert("Lỗi định dạng", "Tiêu đề file không đúng định dạng. Phải có 2 cột: 'TransactionID' và 'ItemDescription'.");
+                        return;
+                    }
                     continue; // Bỏ qua dòng tiêu đề
                 }
 
+
                 String[] parts = line.split(",", 2);
-                if (parts.length < 2) continue;
+                if (parts.length != 2) {
+                    showErrorAlert("Lỗi định dạng", "File dữ liệu không đúng định dạng. Mỗi dòng phải có 2 cột.");
+                    return;
+                }
 
                 int id = Integer.parseInt(parts[0].trim());
                 String description = parts[1].trim();
 
-                // Thêm vào bảng TableView
                 data.add(new Transaction(id, description));
 
-                String descriptions = parts[1].trim().replaceAll("^\"|\"$", ""); // Loại dấu ngoặc kép
+                String descriptions = parts[1].trim().replaceAll("^\"|\"$", "");
                 String[] items = descriptions.split(",");
                 List<String> itemList = new ArrayList<>();
                 for (String item : items) {
@@ -152,29 +258,32 @@ public class HelloController {
                         itemList.add(item.trim());
                     }
                 }
-
-                transactions.add(itemList);
-
-                // Thêm vào danh sách transactions
                 transactions.add(itemList);
             }
 
-            // In transactions ra console để kiểm tra
-            System.out.println("Transactions:");
-            for (List<String> transaction : transactions) {
-                for (String item : transaction) {
-                    System.out.print(item+ " - ");
-                }
-                System.out.println();
-            }
 
             tableView.setItems(data);
             updatePieChart(transactions);
+            for (List<String> items : transactions) {
+                for (String item : items) {
+                    System.out.print(item + " ");
+                }
+                System.out.println();
+            }
+            updateLabel();
 
         } catch (IOException | NumberFormatException e) {
             e.printStackTrace();
         }
     }
+
+    private void showErrorAlert(String title, String content) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setContentText(content);
+        alert.showAndWait();
+    }
+
 
     private void updatePieChart(List<List<String>> transactions) {
         Map<String, Integer> itemCount = new HashMap<>();
@@ -194,12 +303,51 @@ public class HelloController {
             int count = entry.getValue();
             double percentage = (double) count / totalItems * 100;
 
-            pieChartData.add(new PieChart.Data(item + " (" + String.format("%.1f", percentage) + "%)", count));
+            pieChartData.add(new PieChart.Data(item + " ("+count+" - " + String.format("%.1f", percentage) + "%)", count));
         }
 
         pieChart.setData(pieChartData);
         pieChart.setTitle("Tỷ lệ xuất hiện món hàng");
     }
 
+    public Group createVisualNode(PPCNode node, double x, double y) {
+        Circle circle = new Circle(x, y, 22);
+        circle.setFill(Color.LIGHTBLUE);
+        circle.setStroke(Color.DARKBLUE);
+        circle.setStrokeWidth(2);
 
+        // Text item bên trong circle
+        Text itemText = new Text(node.item);
+        itemText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        itemText.setX(x - itemText.getLayoutBounds().getWidth() / 2);
+        itemText.setY(y + 5);
+
+        Group group = new Group(circle, itemText);
+        Tooltip tooltip = new Tooltip("pre: " + node.preOrder +
+                "\npost: " + node.postOrder+
+                "\nfreq: " + node.frequency );
+        tooltip.setShowDelay(Duration.millis(100));
+        tooltip.setHideDelay(Duration.millis(200));
+        tooltip.setShowDuration(Duration.seconds(10));
+        Tooltip.install(group, tooltip); // gán vào cả group
+        return group;
+    }
+
+
+    public void drawTree(PPCNode node, Pane pane, double x, double y, double xOffset) {
+        Group visualNode = createVisualNode(node, x, y);
+        pane.getChildren().add(visualNode);
+
+        double childX = x - (xOffset * (node.children.size() - 1)) / 2;
+        for (PPCNode child : node.children) {
+            double childY = y + 100;
+
+            // vẽ đường từ cha đến con
+            Line line = new Line(x, y + 22, childX, childY - 22);
+            pane.getChildren().add(line);
+
+            drawTree(child, pane, childX, childY, xOffset / 1.5);
+            childX += xOffset;
+        }
+    }
 }

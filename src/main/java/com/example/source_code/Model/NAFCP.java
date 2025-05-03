@@ -8,6 +8,7 @@ public class NAFCP {
     private final List<String> frequentItems;
     private final Map<String, Integer> itemFrequency;
     private double minSup;
+    private int threshold;
     private int transactionCount;
     private final List<Set<String>> frequentClosedItemsets;
 
@@ -24,7 +25,7 @@ public class NAFCP {
     public void buildPPCTree(List<List<String>> transactions, double minSup) {
         this.minSup = minSup;
         this.transactionCount = transactions.size();
-        int threshold = (int) Math.ceil(minSup * transactionCount);
+        this.threshold = (int) Math.ceil(minSup * transactionCount);
 
         System.out.println("Step 1: Building PPC-tree");
         System.out.println("Transaction count: " + transactionCount);
@@ -65,6 +66,10 @@ public class NAFCP {
         assignPrePostOrder(root, new int[]{0}, new int[]{0});
         System.out.println("PPC-tree constructed. Printing tree structure:");
         printTree(root, 0);
+    }
+
+    public List<String> getFrequentItems() {
+        return frequentItems;
     }
 
     // Chèn giao dịch vào PPC-tree
@@ -253,7 +258,7 @@ public class NAFCP {
     }
 
     // Lấy N-list của tập hợp
-    private List<PPCode> getNList(Set<String> itemset) {
+    public List<PPCode> getNList(Set<String> itemset) {
         if(itemset.size() > 1){
             return nListMap.getOrDefault(String.join(",", itemset), new ArrayList<>());
         }
@@ -270,6 +275,10 @@ public class NAFCP {
             }
             return intersection != null ? intersection : new ArrayList<>();
         }
+    }
+
+    public Map<String, List<PPCode>> getnListMap() {
+        return nListMap;
     }
 
     // Giao các N-list dựa trên quan hệ tổ tiên-con
@@ -295,9 +304,12 @@ public class NAFCP {
         return result;
     }
 
+    public PPCNode getRoot() {
+        return root;
+    }
 
     // Tính tần suất hỗ trợ
-    private int calculateSupport(List<PPCode> nList) {
+    public int calculateSupport(List<PPCode> nList) {
         int support = 0;
         for (PPCode code : nList) {
             support += code.frequency;
