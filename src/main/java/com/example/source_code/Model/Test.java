@@ -360,6 +360,28 @@ public class Test {
         nafcp.generateNLists();
         nafcp.findFCIs();
 
+        // Lấy các mẫu đóng thường xuyên (FCIs)
+        List<Set<String>> frequentClosedItemsets = nafcp.getFrequentClosedItemsets();
+
+        // Lấy tần suất hỗ trợ cho mỗi mẫu
+        Map<Set<String>, Integer> supportMap = new HashMap<>();
+        for (Set<String> itemset : frequentClosedItemsets) {
+            List<PPCode> nList = nafcp.getNList(itemset);
+            int support = nafcp.calculateSupport(nList);
+            supportMap.put(itemset, support);
+        }
+
+        // Khởi tạo đối tượng AssociationRuleMiner để sinh các luật
+        AssociationRuleMiner miner = new AssociationRuleMiner(frequentClosedItemsets, supportMap, nafcp.transactionCount, 0.8,1); // minConfidence = 50%
+        List<Rule> rules = miner.generateRules();
+
+        // In các luật kết hợp
+        System.out.println("\nGenerated Association Rules:");
+        for (Rule rule : rules) {
+            System.out.println(rule);
+        }
+
+
         // In kết quả cuối cùng
         System.out.println("\nFinal Frequent Closed Itemsets:");
         for (Set<String> itemset : nafcp.getFrequentClosedItemsets()) {

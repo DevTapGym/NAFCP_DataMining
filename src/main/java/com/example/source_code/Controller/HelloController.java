@@ -1,8 +1,5 @@
 package com.example.source_code.Controller;
-import com.example.source_code.Model.NAFCP;
-import com.example.source_code.Model.PPCNode;
-import com.example.source_code.Model.PPCode;
-import com.example.source_code.Model.Transaction;
+import com.example.source_code.Model.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -50,6 +47,12 @@ public class HelloController {
     private Slider slider;
 
     @FXML
+    private Slider slider1;
+
+    @FXML
+    private Slider slider2;
+
+    @FXML
     private PieChart pieChart;
 
     @FXML
@@ -65,6 +68,12 @@ public class HelloController {
     private Label labelSupportCount;
 
     @FXML
+    private Label labelMinConfidence;
+
+    @FXML
+    private Label labelLift;
+
+    @FXML
     private Pane paneDraw;
 
     @FXML
@@ -75,10 +84,14 @@ public class HelloController {
 
     private List<List<String>> transactions = new ArrayList<>();
     private double minSup = 50.0;
+    private double confidence = 0.5;
+    private double lift = 1.0;
 
     @FXML
     public void initialize() {
         labelMinSup.setText("Min-Supporst: "+minSup +" %");
+        labelMinConfidence.setText("Min-Confidence: "+confidence);
+        labelLift.setText("Lift: "+ lift);
 
         updateLabel();
 
@@ -102,11 +115,45 @@ public class HelloController {
         slider.setMinorTickCount(0);
         slider.setBlockIncrement(10);
 
+        slider1.setMin(0.5);
+        slider1.setMax(1);
+        slider1.setValue(0.5);
+        slider1.setShowTickMarks(true);
+        slider1.setShowTickLabels(true);
+        slider1.setSnapToTicks(true);
+        slider1.setMajorTickUnit(0.1);
+        slider1.setMinorTickCount(0);
+        slider1.setBlockIncrement(0.1);
+
+        slider2.setMin(1);
+        slider2.setMax(2);
+        slider2.setValue(1);
+        slider2.setShowTickMarks(true);
+        slider2.setShowTickLabels(true);
+        slider2.setSnapToTicks(true);
+        slider2.setMajorTickUnit(0.25);
+        slider2.setMinorTickCount(0);
+        slider2.setBlockIncrement(0.25);
+
         slider.valueProperty().addListener((obs, oldVal, newVal) -> {
             double rounded = Math.round(newVal.doubleValue() / 10) * 10;
             slider.setValue(rounded);
             minSup = rounded;
             labelMinSup.setText("Min-Supporst: "+minSup +" %");
+            updateLabel();
+        });
+
+        slider1.valueProperty().addListener((obs, oldVal, newVal) -> {
+            slider1.setValue(newVal.doubleValue());
+            confidence = newVal.doubleValue();
+            labelMinConfidence.setText("Min-Confidence: "+confidence);
+            updateLabel();
+        });
+
+        slider2.valueProperty().addListener((obs, oldVal, newVal) -> {
+            slider2.setValue(newVal.doubleValue());
+            lift = newVal.doubleValue();
+            labelLift.setText("Lift: "+ lift);
             updateLabel();
         });
 
@@ -181,7 +228,27 @@ public class HelloController {
             for (Set<String> itemset : nafcp.getFrequentClosedItemsets()) {
                 appendTextToFlow(itemset + " #SUP: " + nafcp.calculateSupport(nafcp.getNList(itemset))+"\n",false);
             }
+            appendTextToFlow("Các tập phổ biến được tạo từ tập phổ biến đóng: \n",true);
+            List<Set<String>> frequentClosedItemsets = nafcp.getFrequentClosedItemsets();
 
+            Map<Set<String>, Integer> supportMap = new HashMap<>();
+            for (Set<String> itemset : frequentClosedItemsets) {
+                List<PPCode> nList = nafcp.getNList(itemset);
+                int support = nafcp.calculateSupport(nList);
+                supportMap.put(itemset, support);
+            }
+
+            AssociationRuleMiner miner = new AssociationRuleMiner(frequentClosedItemsets, supportMap, transactions.size() , confidence, lift); // minConfidence = 50%
+            List<Rule> rules = miner.generateRules();
+            Map<Set<String>, Integer> frequentItemsets = miner.getFrequentItemsets();
+            for (Map.Entry<Set<String>, Integer> entry : frequentItemsets.entrySet()) {
+                appendTextToFlow("[" + String.join(", ", entry.getKey()) + "] #SUP: " + entry.getValue()+"\n",false);
+            }
+
+            appendTextToFlow("Các luật kết hợp được khai thác những tập phổ biến: \n",true);
+            for (Rule rule : rules) {
+                appendTextToFlow(rule.toString()+"\n",false);
+            }
         }
     }
 
@@ -196,6 +263,8 @@ public class HelloController {
             if (response == ButtonType.OK) {
                 minSup = 50.0;
                 slider.setValue(50);
+                slider1.setValue(0.5);
+                slider2.setValue(1);
                 deleteOldData();
                 tableView.getItems().clear();
                 transactions = new ArrayList<>();
