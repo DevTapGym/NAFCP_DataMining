@@ -9,7 +9,7 @@ public class AssociationRuleMiner {
     private final double lift;
     Map<Set<String>, Integer> frequentItemsets = new HashMap<>();
 
-    public AssociationRuleMiner(List<Set<String>> closedItemsets,
+    public AssociationRuleMiner(
                                 Map<Set<String>, Integer> supportMap,
                                 int transactionCount,
                                 double minConfidence,

@@ -372,7 +372,7 @@ public class Test {
         }
 
         // Khởi tạo đối tượng AssociationRuleMiner để sinh các luật
-        AssociationRuleMiner miner = new AssociationRuleMiner(frequentClosedItemsets, supportMap, nafcp.transactionCount, 0.8,1); // minConfidence = 50%
+        AssociationRuleMiner miner = new AssociationRuleMiner(supportMap, nafcp.transactionCount, 0.8,1); // minConfidence = 50%
         List<Rule> rules = miner.generateRules();
 
         // In các luật kết hợp

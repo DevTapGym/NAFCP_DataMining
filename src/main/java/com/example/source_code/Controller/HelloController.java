@@ -238,7 +238,7 @@ public class HelloController {
                 supportMap.put(itemset, support);
             }
 
-            AssociationRuleMiner miner = new AssociationRuleMiner(frequentClosedItemsets, supportMap, transactions.size() , confidence, lift); // minConfidence = 50%
+            AssociationRuleMiner miner = new AssociationRuleMiner(supportMap, transactions.size() , confidence, lift); // minConfidence = 50%
             List<Rule> rules = miner.generateRules();
             Map<Set<String>, Integer> frequentItemsets = miner.getFrequentItemsets();
             for (Map.Entry<Set<String>, Integer> entry : frequentItemsets.entrySet()) {
